@@ -1,29 +1,54 @@
+from xml.dom import ValidationErr
 from rest_framework import status
 from rest_framework.response import Response
+from rest_framework.exceptions import ValidationError
 # from rest_framework.decorators import api_view
 from rest_framework.views import APIView
 from rest_framework import mixins
 from rest_framework import generics
 from rest_framework import viewsets
+from rest_framework.permissions import IsAuthenticatedOrReadOnly
+
 from ..models import WatchList, StreamPlatform, Review
 from .serializers import WatchSerializer, StreamPlatformSerializer, ReviewSerializer
 
-from django.https import get_object_or_404
+from .permissions import AdminOrReadOnly, ReviewUserOrReadOnly
+
+from django.shortcuts import get_object_or_404
 
 
 class ReviewCreate(generics.CreateAPIView):
 
     serializer_class = ReviewSerializer
 
+    def get_queryset(self):
+        return Review.objects.all()
+
     def perform_create(self, serializer):
         pk = self.kwargs.get('pk')
         movie = WatchList.objects.get(pk=pk)
-        serializer.save(watchlist=movie)
+        review_user = self.request.user
+        review_queryset = Review.objects.filter(
+            watchlist=movie, review_user=review_user)
+
+        if review_queryset.exists():
+            raise ValidationError("You have already reviewed this movie.")
+
+        if movie.number_rating == 0:
+            movie.avg_rating = serializer.validated_data['rating']
+        else:
+            movie.avg_rating = (movie.avg_rating +
+                                serializer.validated_data['rating']) / 2
+
+        movie.number_rating = movie.number_rating + 1
+        movie.save()
+        serializer.save(watchlist=movie, review_user=review_user)
 
 
 class ReviewList(generics.ListCreateAPIView):
     #queryset = Review.objects.all()
     serializer_class = ReviewSerializer
+    permission_classes = [IsAuthenticatedOrReadOnly]
 
     def get_queryset(self):
         pk = self.kwargs['pk']
@@ -33,7 +58,7 @@ class ReviewList(generics.ListCreateAPIView):
 class ReviewDetail(generics.RetrieveUpdateDestroyAPIView):
     queryset = Review.objects.all()
     serializer_class = ReviewSerializer
-
+    permission_classes = [ReviewUserOrReadOnly]
 
 # class ReviewList(mixins.ListModelMixin, mixins.CreateModelMixin, generics.GenericAPIView):
 #     queryset = Review.objects.all()
@@ -62,17 +87,33 @@ class ReviewDetail(generics.RetrieveUpdateDestroyAPIView):
 #         return self.destroy(request, *args, **kwargs)
 
 
-class StreamPlatform(viewsets.ViewSet):
-    def list(self, request):
-        queryset = StreamPlatform.objects.all()
-        serializer = StreamPlatformSerializer(queryset, many=True)
-        return Response(serializer.data)
+class StreamPlatformVS(viewsets.ModelViewSet):
+    queryset = StreamPlatform.objects.all()
+    serializer_class = StreamPlatformSerializer
 
-    def retrieve(self, request, pk=None):
-        queryset = StreamPlatform.objects.all()
-        Watchlist = get_object_or_404(queryset, pk=pk)
-        serializer = StreamPlatformSerializer(Watchlist)
-        return Response(serializer.data)
+
+# class StreamPlatformVS(viewsets.ViewSet):
+#     def list(self, request):
+#         queryset = StreamPlatform.objects.all()
+#         serializer = StreamPlatformSerializer(
+#             queryset, many=True, context={'request': request})
+#         return Response(serializer.data)
+
+#     def retrieve(self, request, pk=None):
+#         queryset = StreamPlatform.objects.all()
+#         Watchlist = get_object_or_404(queryset, pk=pk)
+#         serializer = StreamPlatformSerializer(
+#             Watchlist, context={'request': request})
+#         return Response(serializer.data)
+
+#     def create(self, request):
+#         serializer = StreamPlatformSerializer(
+#             data=request.data, context={'request': request})
+#         if serializer.is_valid():
+#             serializer.save()
+#             return Response(serializer.data)
+#         else:
+#             return Response(status=status.HTTP_204_NO_CONTENT)
 
 
 class StreamPlatformAV(APIView):

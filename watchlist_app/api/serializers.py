@@ -4,6 +4,7 @@ from ..models import WatchList, StreamPlatform, Review
 
 
 class ReviewSerializer(serializers.ModelSerializer):
+    review_user = serializers.StringRelatedField(read_only=True)
 
     class Meta:
         model = Review
@@ -19,7 +20,7 @@ class WatchSerializer(serializers.ModelSerializer):
         fields = "__all__"
 
 
-class StreamPlatformSerializer(serializers.HyperlinkedModelSerializer):
+class StreamPlatformSerializer(serializers.ModelSerializer):
     wathclist = WatchSerializer(
         many=True, read_only=True)  # nested Serializers
     # wathclist = serializers.StringRelatedField(many=True)        # String Field
