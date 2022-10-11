@@ -89,6 +89,11 @@ class WatchListTestCase(APITestCase):
             reverse('Watch-list'))
         self.assertEqual(respoonse.status_code, status.HTTP_200_OK)
 
+    # for get list weatchlist new
+    def test_watchList_list_new(self):
+        respoonse = self.client.get(reverse('Watch-list-new'))
+        self.assertEqual(respoonse.status_code, status.HTTP_200_OK)
+
     # for get only movie individual
 
     def test_watchList_ind(self):
@@ -191,6 +196,11 @@ class ReviewTestCase(APITestCase):
     def test_review_ind(self):
         respoonse = self.client.get(
             reverse('review-detail', args=(self.review.id,)))
+        self.assertEqual(respoonse.status_code, status.HTTP_200_OK)
+
+    def test_review_user(self):
+        respoonse = self.client.get(
+            f'/watch/reviews/?username={self.user.username}')
         self.assertEqual(respoonse.status_code, status.HTTP_200_OK)
 
     # def test_review_delete(self):

@@ -1,35 +1,21 @@
-from xml.dom import ValidationErr
 from rest_framework import status
 from rest_framework.response import Response
 from rest_framework.exceptions import ValidationError
-# from rest_framework.decorators import api_view
 from rest_framework.views import APIView
-from rest_framework import mixins
-from rest_framework import generics
-from rest_framework import viewsets
+from rest_framework import mixins, generics, viewsets
 from rest_framework.permissions import IsAuthenticatedOrReadOnly, IsAuthenticated
-
-from ..models import WatchList, StreamPlatform, Review
-from .serializers import WatchSerializer, StreamPlatformSerializer, ReviewSerializer
-
-from .permissions import IsAdminOrReadOnly, IsReviewUserOrReadOnly
-
-from django.shortcuts import get_object_or_404
-
 from rest_framework.throttling import UserRateThrottle, AnonRateThrottle, ScopedRateThrottle
-
-from watchlist_app.api.throttling import ReviewCreateThrottle, ReviewListThrottle
-
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework import filters
-
-from watchlist_app.api.pagination import WatchListPagination, WatchListLOPagination, WatchListCPagination
+from django.shortcuts import get_object_or_404
+from . import pagination, throttling, serializers, permissions
+from ..models import WatchList, StreamPlatform, Review
 
 
 class UserReview(generics.ListAPIView):
 
     #queryset = Review.objects.all()
-    serializer_class = ReviewSerializer
+    serializer_class = serializers.ReviewSerializer
     #permission_classes = [IsAuthenticated]
 
     # def get_queryset(self):
@@ -43,9 +29,9 @@ class UserReview(generics.ListAPIView):
 
 class ReviewCreate(generics.CreateAPIView):
 
-    serializer_class = ReviewSerializer
+    serializer_class = serializers.ReviewSerializer
     permission_classes = [IsAuthenticated]
-    throttle_classes = [ReviewCreateThrottle]
+    throttle_classes = [throttling.ReviewCreateThrottle]
 
     def get_queryset(self):
         return Review.objects.all()
@@ -73,7 +59,7 @@ class ReviewCreate(generics.CreateAPIView):
 
 class ReviewList(generics.ListAPIView):
     #queryset = Review.objects.all()
-    serializer_class = ReviewSerializer
+    serializer_class = serializers.ReviewSerializer
     #permission_classes = [IsAuthenticated]
     # throttle_classes = [ReviewListThrottle, AnonRateThrottle]
     filter_backends = [DjangoFilterBackend]
@@ -86,8 +72,8 @@ class ReviewList(generics.ListAPIView):
 
 class ReviewDetail(generics.RetrieveUpdateDestroyAPIView):
     queryset = Review.objects.all()
-    serializer_class = ReviewSerializer
-    permission_classes = [IsReviewUserOrReadOnly]
+    serializer_class = serializers.ReviewSerializer
+    permission_classes = [permissions.IsReviewUserOrReadOnly]
     throttle_classes = [ScopedRateThrottle]
     throttle_scope = 'review-detail'
 
@@ -121,8 +107,8 @@ class ReviewDetail(generics.RetrieveUpdateDestroyAPIView):
 
 class StreamPlatformVS(viewsets.ModelViewSet):
     queryset = StreamPlatform.objects.all()
-    serializer_class = StreamPlatformSerializer
-    permission_classes = [IsAdminOrReadOnly]
+    serializer_class = serializers.StreamPlatformSerializer
+    permission_classes = [permissions.IsAdminOrReadOnly]
 
 # class StreamPlatformVS(viewsets.ViewSet):
 #     def list(self, request):
@@ -150,16 +136,16 @@ class StreamPlatformVS(viewsets.ModelViewSet):
 
 class StreamPlatformAV(APIView):
 
-    permission_classes = [IsAdminOrReadOnly]
+    permission_classes = [permissions. IsAdminOrReadOnly]
 
     def get(self, request):
         platform = StreamPlatform.objects.all()
-        serializer = StreamPlatformSerializer(
+        serializer = serializers.StreamPlatformSerializer(
             platform, many=True, context={'request': request})
         return Response(serializer.data)
 
     def post(self, request):
-        serializer = StreamPlatformSerializer(data=request.data)
+        serializer = serializers.StreamPlatformSerializer(data=request.data)
         if serializer.is_valid():
             serializer.save()
             return Response(serializer.data)
@@ -169,20 +155,21 @@ class StreamPlatformAV(APIView):
 
 class StreamDetailsAV(APIView):
 
-    permission_classes = [IsAdminOrReadOnly]
+    permission_classes = [permissions.IsAdminOrReadOnly]
 
     def get(self, request, pk):
         try:
             platform = StreamPlatform.objects.get(pk=pk)
         except StreamPlatform.DoesNotExist:
             return Response({'Error': 'Not found'}, status=status.HTTP_404_NOT_FOUND)
-        serializer = StreamPlatformSerializer(
+        serializer = serializers.StreamPlatformSerializer(
             platform, context={'request': request})
         return Response(serializer.data)
 
     def put(self, request, pk):
         platform = StreamPlatform.objects.get(pk=pk)
-        serializer = StreamPlatformSerializer(platform, data=request.data)
+        serializer = serializers.StreamPlatformSerializer(
+            platform, data=request.data)
 
         if serializer.is_valid():
             serializer.save()
@@ -198,23 +185,23 @@ class StreamDetailsAV(APIView):
 
 class WatchListGV(generics.ListAPIView):
     queryset = WatchList.objects.all()
-    serializer_class = WatchSerializer
+    serializer_class = serializers.WatchSerializer
     # filter_backends = [filters.OrderingFilter]
     # ordering_fields = ['avg_rating']
-    pagination_class = WatchListCPagination
+    pagination_class = pagination.WatchListCPagination
 
 
 class WatchListAV(APIView):
 
-    permission_classes = [IsAdminOrReadOnly]
+    permission_classes = [permissions.IsAdminOrReadOnly]
 
     def get(self, request):
         Movies = WatchList.objects.all()
-        serializer = WatchSerializer(Movies, many=True)
+        serializer = serializers.WatchSerializer(Movies, many=True)
         return Response(serializer.data)
 
     def post(self, request):
-        serializer = WatchSerializer(data=request.data)
+        serializer = serializers.WatchSerializer(data=request.data)
         if serializer.is_valid():
             serializer.save()
             return Response(serializer.data)
@@ -224,7 +211,7 @@ class WatchListAV(APIView):
 
 class WatchDetailsAV(APIView):
 
-    permission_classes = [IsAdminOrReadOnly]
+    permission_classes = [permissions.IsAdminOrReadOnly]
 
     def get(self, request, pk):
 
@@ -232,12 +219,12 @@ class WatchDetailsAV(APIView):
             movie = WatchList.objects.get(pk=pk)
         except WatchList.DoesNotExist:
             return Response({'Error': 'Not found'}, status=status.HTTP_404_NOT_FOUND)
-        serializer = WatchSerializer(movie)
+        serializer = serializers.WatchSerializer(movie)
         return Response(serializer.data)
 
     def put(self, request, pk):
         movie = WatchList.objects.get(pk=pk)
-        serializer = WatchSerializer(movie, data=request.data)
+        serializer = serializers.WatchSerializer(movie, data=request.data)
         if serializer.is_valid():
             serializer.save()
             return Response(serializer.data)
